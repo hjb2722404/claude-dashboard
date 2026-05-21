@@ -128,12 +128,12 @@ export function getSessionDetail(projectPath: string, sessionId: string) {
 }
 
 // 解码项目路径（D--projects-xxx → D:\projects\xxx）
-// WARNING: 当前实现有缺陷——无法正确处理路径中包含 `-` 的目录名。
-// 例如 D--projects-my-project 会被错误解码为 D:\projects\my\project
-// 而非 D:\projects\my-project。需要根据实际 JSONL 数据格式做进一步调整。
+// 编码规则：-- → :\（驱动器），- → \（路径分隔）
+// 注意：目录名中含 - 时会有歧义，此函数做近似解码，精确匹配用原始 path
 export function decodeProjectPath(encoded: string): string {
-  // Windows 路径: D--projects-xxx → D:\projects\xxx
-  // Unix 路径: home-user-xxx → /home/user/xxx
-  const decoded = encoded.replace(/--/g, ':\\').replace(/-/g, '\\');
+  // 驱动器: D-- → D:\
+  let decoded = encoded.replace(/--/g, ':\\');
+  // 路径分隔: - → \
+  decoded = decoded.replace(/-/g, '\\');
   return decoded;
 }
