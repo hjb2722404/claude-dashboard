@@ -36,9 +36,9 @@ function MessageBubble({ message }: MessageBubbleProps) {
               <details key={i} className="border border-gray-200 rounded-lg overflow-hidden">
                 <summary className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 cursor-pointer hover:bg-gray-100">
                   <span className="text-blue-600">{tool.name}</span>
-                  {tool.input.file_path && (
+                  {typeof tool.input.file_path === 'string' && (
                     <span className="ml-2 text-gray-500 font-mono text-xs">
-                      {(tool.input.file_path as string).split('/').pop()}
+                      {tool.input.file_path.split('/').pop()}
                     </span>
                   )}
                 </summary>

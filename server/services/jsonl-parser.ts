@@ -5,6 +5,7 @@ interface RawEntry {
   uuid?: string;
   parentUuid?: string;
   timestamp?: string;
+  sessionId?: string;
   message?: {
     role?: string;
     content?: string | Array<Record<string, unknown>>;
@@ -30,42 +31,11 @@ export function parseSession(jsonlContent: string): SessionDetail {
     }
   }
 
-  // 构建 UUID → entry 映射
-  const entryMap = new Map<string, RawEntry>();
-  for (const entry of entries) {
-    if (entry.uuid) {
-      entryMap.set(entry.uuid, entry);
-    }
-  }
-
-  // 找到叶子节点（last-prompt 类型）
-  const leafEntry = entries.find((e) => e.type === 'last-prompt');
-  const leafUuid = leafEntry?.leafUuid;
-
-  if (!leafUuid) {
-    return {
-      id: '',
-      model: 'unknown',
-      messages: [],
-      totalTokens: { input: 0, output: 0 },
-      filesModified: [],
-    };
-  }
-
-  // 沿 parentUuid 反向遍历构建消息链
-  const messageChain: RawEntry[] = [];
-  let currentUuid: string | undefined = leafUuid;
-
-  while (currentUuid) {
-    const entry = entryMap.get(currentUuid);
-    if (!entry) break;
-
-    messageChain.push(entry);
-    currentUuid = entry.parentUuid;
-  }
-
-  // 反转为正序
-  messageChain.reverse();
+  // 收集所有消息条目，按时间戳排序
+  // 不依赖 last-prompt leafUuid（其可能指向 attachment 等非消息类型）
+  const messageChain = entries
+    .filter((e) => (e.type === 'message' || e.type === 'user') && e.message)
+    .sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
 
   // 转换为 Message 格式
   const messages: Message[] = [];
@@ -134,8 +104,7 @@ export function parseSession(jsonlContent: string): SessionDetail {
   const model = modelEntry?.message?.model || 'unknown';
 
   // 获取会话 ID
-  const firstEntry = entries[0];
-  const sessionId = firstEntry?.uuid || '';
+  const sessionId = entries[0]?.sessionId || '';
 
   return {
     id: sessionId,
