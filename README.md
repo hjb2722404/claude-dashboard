@@ -19,11 +19,11 @@ Claude Code 会话仪表板 —— 在本地可视化浏览、搜索和分析你
 
 从 [GitHub Releases](https://github.com/he-jianbo/claude-dashboard/releases) 下载最新版本的 `claude-code-dashboard.zip`，解压后运行：
 
-```bash
-unzip claude-code-dashboard.zip -d claude-dashboard
-cd claude-dashboard
-node cli.cjs
-```
+- **Mac / Linux**：双击 `start.sh` 或终端执行 `./start.sh`
+- **Windows**：双击 `start.bat`
+- **通用方式**：`node cli.cjs`
+
+> 需要 [Node.js 18+](https://nodejs.org)
 
 ### 方式二：源码运行
 

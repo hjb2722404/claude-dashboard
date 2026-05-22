@@ -44,6 +44,16 @@ if (fs.existsSync(clientDir)) {
   copyDir(clientDir, standaloneClientDir);
 }
 
+// 复制启动脚本
+for (const script of ['start.sh', 'start.bat']) {
+  const src = path.join(root, script);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, path.join(outDir, script));
+  }
+}
+
 console.log('\nStandalone build complete!');
 console.log(`  Output: ${outDir}/`);
 console.log('  Run:    node dist/standalone/cli.cjs');
+console.log('    or:   ./start.sh (Mac/Linux)');
+console.log('    or:   start.bat (Windows)');
