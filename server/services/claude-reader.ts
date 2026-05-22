@@ -1,13 +1,34 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
-const CLAUDE_PROJECTS_DIR = path.join(
-  process.env.HOME || process.env.USERPROFILE || '',
-  '.claude',
-  'projects'
-);
+// 获取 Claude 数据目录，优先级：环境变量 > 默认路径
+function resolveClaudeDir(): string {
+  if (process.env.CLAUDE_DATA_DIR) return process.env.CLAUDE_DATA_DIR;
+  return path.join(os.homedir(), '.claude');
+}
 
-// 复用共享类型，不重复定义
+export function getClaudeProjectsDir(): string {
+  return path.join(resolveClaudeDir(), 'projects');
+}
+
+// 平台感知的路径解码
+export function decodeProjectPath(encoded: string): string {
+  const platform = os.platform();
+
+  if (platform === 'win32') {
+    // Windows: -- → :\ (驱动器), - → \ (路径分隔)
+    // 先处理 --，再处理单独的 -
+    let decoded = encoded.replace(/--/g, ':\\');
+    decoded = decoded.replace(/-/g, '\\');
+    return decoded;
+  }
+
+  // macOS / Linux: - → / (路径分隔)
+  // 没有驱动器编码，所以 -- 不需要特殊处理
+  return encoded.replace(/-/g, '/');
+}
+
 export interface ProjectInfo {
   path: string;
   displayName: string;
@@ -23,11 +44,30 @@ export interface SessionInfo {
   model: string;
 }
 
-// 获取所有项目列表
+// 通用缓存
+interface CacheEntry<T> {
+  data: T;
+  time: number;
+}
+
+const caches = new Map<string, CacheEntry<unknown>>();
+
+export function cached<T>(key: string, ttl: number, fn: () => T): T {
+  const entry = caches.get(key);
+  if (entry && Date.now() - entry.time < ttl) return entry.data as T;
+  const data = fn();
+  caches.set(key, { data, time: Date.now() });
+  return data;
+}
+
+export function clearCache(key?: string) {
+  if (key) caches.delete(key);
+  else caches.clear();
+}
+
 export function getProjects(): ProjectInfo[] {
-  if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) {
-    return [];
-  }
+  const CLAUDE_PROJECTS_DIR = getClaudeProjectsDir();
+  if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) return [];
 
   const entries = fs.readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true });
 
@@ -37,14 +77,9 @@ export function getProjects(): ProjectInfo[] {
       const projectDir = path.join(CLAUDE_PROJECTS_DIR, dir.name);
       const jsonlFiles = fs.readdirSync(projectDir).filter((f) => f.endsWith('.jsonl'));
 
-      if (jsonlFiles.length === 0) {
-        return null;
-      }
+      if (jsonlFiles.length === 0) return null;
 
-      // 获取最新修改时间
-      const stats = jsonlFiles.map((f) =>
-        fs.statSync(path.join(projectDir, f))
-      );
+      const stats = jsonlFiles.map((f) => fs.statSync(path.join(projectDir, f)));
       const lastModified = Math.max(...stats.map((s) => s.mtimeMs));
 
       return {
@@ -57,13 +92,10 @@ export function getProjects(): ProjectInfo[] {
     .filter((p): p is ProjectInfo => p !== null);
 }
 
-// 获取项目下的会话列表
 export function getSessions(projectPath: string): SessionInfo[] {
+  const CLAUDE_PROJECTS_DIR = getClaudeProjectsDir();
   const projectDir = path.join(CLAUDE_PROJECTS_DIR, projectPath);
-
-  if (!fs.existsSync(projectDir)) {
-    return [];
-  }
+  if (!fs.existsSync(projectDir)) return [];
 
   const jsonlFiles = fs.readdirSync(projectDir).filter((f) => f.endsWith('.jsonl'));
 
@@ -73,7 +105,6 @@ export function getSessions(projectPath: string): SessionInfo[] {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split('\n').filter((l) => l.trim());
 
-    // 解析会话摘要信息
     let messageCount = 0;
     let totalTokens = 0;
     let model = 'unknown';
@@ -83,26 +114,24 @@ export function getSessions(projectPath: string): SessionInfo[] {
       try {
         const entry = JSON.parse(line);
 
-        if (entry.type === 'message' || entry.type === 'user') {
+        if (entry.type === 'user' || entry.type === 'assistant') {
           messageCount++;
         }
 
-        if (entry.usage) {
+        if (entry.message?.usage) {
           totalTokens +=
-            (entry.usage.input_tokens || 0) +
-            (entry.usage.output_tokens || 0);
+            (entry.message.usage.input_tokens || 0) +
+            (entry.message.usage.output_tokens || 0);
         }
 
-        if (entry.model && entry.model !== model) {
-          model = entry.model;
+        if (entry.message?.model && entry.message.model !== 'unknown') {
+          model = entry.message.model;
         }
 
         if (entry.timestamp && !startTime) {
           startTime = entry.timestamp;
         }
-      } catch {
-        // 跳过损坏的行
-      }
+      } catch { /* skip */ }
     }
 
     return {
@@ -115,25 +144,9 @@ export function getSessions(projectPath: string): SessionInfo[] {
   });
 }
 
-// 读取完整会话数据
 export function getSessionDetail(projectPath: string, sessionId: string) {
+  const CLAUDE_PROJECTS_DIR = getClaudeProjectsDir();
   const filePath = path.join(CLAUDE_PROJECTS_DIR, projectPath, `${sessionId}.jsonl`);
-
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  const content = fs.readFileSync(filePath, 'utf-8');
-  return content;
-}
-
-// 解码项目路径（D--projects-xxx → D:\projects\xxx）
-// 编码规则：-- → :\（驱动器），- → \（路径分隔）
-// 注意：目录名中含 - 时会有歧义，此函数做近似解码，精确匹配用原始 path
-export function decodeProjectPath(encoded: string): string {
-  // 驱动器: D-- → D:\
-  let decoded = encoded.replace(/--/g, ':\\');
-  // 路径分隔: - → \
-  decoded = decoded.replace(/-/g, '\\');
-  return decoded;
+  if (!fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath, 'utf-8');
 }

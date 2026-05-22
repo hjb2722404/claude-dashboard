@@ -10,16 +10,19 @@ function formatNumber(n: number): string {
 
 function TokenStats({ input, output, cacheRead }: TokenStatsProps) {
   return (
-    <div className="bg-gray-900 text-gray-300 px-6 py-2 text-sm flex items-center gap-6">
-      <span>
-        Token: 输入 <span className="text-white font-medium">{formatNumber(input)}</span>
+    <div className="bg-stone-900 px-6 py-2 text-xs flex items-center gap-5 text-stone-400 border-t border-stone-800">
+      <span className="flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        输入 <span className="text-stone-200 font-medium tabular-nums">{formatNumber(input)}</span>
       </span>
-      <span>
-        | 输出 <span className="text-white font-medium">{formatNumber(output)}</span>
+      <span className="flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-stone-500" />
+        输出 <span className="text-stone-200 font-medium tabular-nums">{formatNumber(output)}</span>
       </span>
       {cacheRead !== undefined && cacheRead > 0 && (
-        <span>
-          | 缓存 <span className="text-white font-medium">{formatNumber(cacheRead)}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-stone-600" />
+          缓存 <span className="text-stone-200 font-medium tabular-nums">{formatNumber(cacheRead)}</span>
         </span>
       )}
     </div>
