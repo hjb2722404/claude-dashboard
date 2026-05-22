@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import path from 'path';
+import fs from 'fs';
 import { startServer } from '../server/index';
 
 const args = process.argv.slice(2);
@@ -31,4 +33,12 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-startServer(port);
+// 自动检测 client 目录（支持 dist/bin/cli.js 和 cli.js 同级两种布局）
+const dir = __dirname;
+const candidates = [
+  path.join(dir, 'client'),        // cli.cjs 和 client/ 同级（standalone）
+  path.join(dir, '../client'),     // cli.cjs 在 dist/bin/，client/ 在 dist/（npm）
+];
+const staticDir = candidates.find(c => fs.existsSync(path.join(c, 'index.html')));
+
+startServer(port, staticDir);

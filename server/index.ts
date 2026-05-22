@@ -9,7 +9,7 @@ import recentRouter from './routes/recent';
 import searchRouter from './routes/search';
 import projectDetailRouter from './routes/project-detail';
 
-export function createServer() {
+export function createServer(staticDir?: string) {
   const app = express();
 
   app.use(cors());
@@ -31,8 +31,9 @@ export function createServer() {
   app.use('/api/project-detail', projectDetailRouter);
 
   // 生产环境：托管前端静态文件
-  // bundle 在 dist/bin/ → 静态文件在 dist/client/
-  const staticDir = path.join(__dirname, '../client');
+  if (!staticDir) {
+    staticDir = path.join(__dirname, '../client');
+  }
   app.use(express.static(staticDir, { index: false }));
 
   // SPA fallback：所有非 /api 路由返回 index.html
@@ -43,9 +44,9 @@ export function createServer() {
   return app;
 }
 
-export function startServer(port?: number) {
+export function startServer(port?: number, staticDir?: string) {
   const PORT = port || parseInt(process.env.PORT || '5174', 10);
-  const app = createServer();
+  const app = createServer(staticDir);
 
   app.listen(PORT, () => {
     console.log(`\n  Claude Dashboard`);
